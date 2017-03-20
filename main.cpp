@@ -1,52 +1,67 @@
-
 #include <SFML/Graphics.hpp>
 #include <cstdlib>
 #include <ctime>
 #include <iostream>
+#include <string.h>
+#include <stdlib.h>
+#include <iomanip>
 
-#include "Minesweeper.h"
+#include "Conway.h"
 
 using namespace std;
 
-const sf::Color open_fill_color = sf::Color::White, closed_fill_color(192, 192, 192);
-const sf::Color number_colors[9] = {
-    sf::Color::White,
-    sf::Color::Blue,
-    sf::Color(0, 128, 0),
-    sf::Color::Red,
-    sf::Color(0, 0, 128),
-    sf::Color(128, 0, 0),
-    sf::Color(0, 128, 128),
-    sf::Color::Black,
-    sf::Color(128, 128, 128)
-};
-const sf::Color mine_color = sf::Color::Red;
+const sf::Color open_fill_color(60,60,60), closed_fill_color(210,210,210);
 
-const int tile_size = 32;
-const int border_size = 2;
+const int tile_size = 10;
+int border_size = 0;
+int frequency = 2;
 
-int main() {
+int main(int argc, char *argv[]) {
     srand(time(nullptr));
 
-    sf::Font font;
-    if (!font.loadFromFile("sansation.ttf")){
-        cout << "Fant ikke skrifttypen 'sansation.ttf'" << endl;
-        exit(0);
+    int height = 50, width = 50;
+
+
+    // Command line parameters
+    for(int i = 1; i < argc; i++){
+        if((strcmp(argv[i], "-f") == 0 || strcmp(argv[i], "--frequency") == 0) && i + 1 < argc){
+            //frequency = strtol(argv[i+1]);
+            frequency = strtol(argv[i+1],&argv[i+1], 10);
+            i++;
+            continue;
+        }
+
+        if(strcmp(argv[i], "-g") == 0 || strcmp(argv[i], "--grid") == 0){
+            border_size = 1;
+            continue;
+        }
+
+        if((strcmp(argv[i], "-d") == 0 || strcmp(argv[i], "--dimensions") == 0) && i + 2 < argc){
+            height = strtol(argv[i+1],&argv[i+1], 10);
+            width = strtol(argv[i+2],&argv[i+2], 10);
+            i += 2;
+            continue;
+        }
+
+        if(strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0){
+            cout << "Conway's game of life\n\n";
+            cout << "Usage: ./conway [-d height width] [-f frequency]\n";
+            cout << "Options:\n";
+            cout << "-g, --grid" << setw(10) << " " << "Display with background grid\n";
+            cout << "-h, --help" << setw(10) << " " << "Show this help\n";
+            return 0;
+        }
     }
 
+    Conway* game = new Conway(width, height);
 
-    cout << "Skriv inn høyde, bredde og antall miner: ";
-    int height = 20, width = 30, mines = 40;
-    cin >> height >> width >> mines;
+    sf::RenderWindow window(sf::VideoMode(width * tile_size, height * tile_size), "Conway's Game of Life", sf::Style::Close);
 
-    Minesweeper* game = new Minesweeper(width, height, mines);
-
-    sf::RenderWindow window(sf::VideoMode(width * tile_size, height * tile_size), "Minesweeper", sf::Style::Close);
-
-    cout << "Velkommen til Minesveiper!" << endl;
-    cout << "Klikk en rute for å åpne den. Trykk ESC eller Q for å avslutte, eller MELLOMROM for å starte på nytt" << endl;
+    cout << "Place living cells with your cursor. Spacebar starts the simulation. Q/Esc to quit" << endl;
 
     window.setFramerateLimit(60);
+
+    sf::Clock clock;
 
     while (window.isOpen()) {
         sf::Event event;
@@ -63,6 +78,7 @@ int main() {
                     break;
                 case sf::Keyboard::Space:
                     // Start simulation
+                    game->startSimulation();
                     break;
                 }
                 break;
@@ -79,7 +95,6 @@ int main() {
 
         window.clear();
 
-
         for(int row = 0; row < height; ++row) {
             for(int col = 0; col < width; ++col) {
                 const int tile_x = col * tile_size, tile_y = row * tile_size;
@@ -88,6 +103,12 @@ int main() {
                 tile.setSize(sf::Vector2f(tile_size - border_size, tile_size - border_size));
                 tile.setFillColor(game->isTileAlive(row, col) ? open_fill_color : closed_fill_color);
                 tile.setPosition(tile_x + border_size / 2.0, tile_y + border_size / 2.0);
+
+                sf::Time elapsedTime = clock.getElapsedTime();
+                if(game->hasSimulationStarted() && elapsedTime.asSeconds() > 1/static_cast<double>(frequency)){
+                    game->nextGeneration();
+                    clock.restart();
+                }
 
                 window.draw(tile);
 
